@@ -113,8 +113,11 @@ class JavaScriptEncoder(ScoutResultEncoder):
             with self.__open_file(config_path, force_write) as f:
                 if first_line:
                     print('%s' % first_line, file=f)
-                print('%s' % json.dumps(content, indent=4 if debug else None, separators=(',', ': '), sort_keys=True,
-                                        cls=ScoutJsonEncoder), file=f)
+                results = json.dumps(content, indent=4 if debug else None, separators=(',', ': '), sort_keys=True, cls=ScoutJsonEncoder)
+                print('%s' % results, file=f)
+                if file_type == 'RESULTS':
+                    store_custom_format(json.loads(results), config_path, self.report_name, force_write)
+
         except AttributeError as e:
             # __open_file returned None
             pass
@@ -140,3 +143,41 @@ class JavaScriptEncoder(ScoutResultEncoder):
                 print_exception(e)
         else:
             return None
+
+def store_custom_format(data, path, report_name, force_write):
+    try:
+        output_path = os.path.normpath(path)
+        path_array = output_path.split(os.sep)
+        path_array.pop()
+        path_array.append('positka')
+        path_array.append(report_name)
+        output_path = os.path.join(*path_array)
+        create_json_file_tree(data, output_path, report_name, force_write)
+    except Exception as e:
+        print_exception(e)
+
+
+
+def create_json_file_tree(data, path, filename, force_write):
+    try:
+        metadata = {}
+        for key in data:
+            if isinstance(data[key], dict):
+                if key[0] == '/':
+                    sub_path = key[1:]
+                else:
+                    sub_path = key
+                sub_dir = os.path.join(path, sub_path)
+                create_json_file_tree(data[key], sub_dir, sub_path, force_write)
+            else:
+                metadata[key] = data[key]
+        output_path = os.path.normpath(path)
+        path_array = output_path.split(os.sep)
+        if path_array[-2] == 'findings':
+            metadata['service'] = path_array[-3]
+            metadata['finding'] = path_array[-1]
+        data_path = os.path.join(path, '{}.json'.format(filename))
+        with JavaScriptEncoder._JavaScriptEncoder__open_file(data_path, force_write) as json_file:
+            print('%s' % json.dumps(metadata, separators=(',', ': '), sort_keys=True, cls=ScoutJsonEncoder), file=json_file)
+    except Exception as e:
+        print_exception(e)
