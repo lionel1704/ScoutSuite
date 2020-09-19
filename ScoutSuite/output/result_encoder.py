@@ -167,6 +167,8 @@ def create_json_file_tree(data, path, filename, force_write):
                     sub_path = key[1:]
                 else:
                     sub_path = key
+                sub_path = sub_path.replace(":", "_")
+                sub_path = sub_path.replace("*", "-")
                 sub_dir = os.path.join(path, sub_path)
                 create_json_file_tree(data[key], sub_dir, sub_path, force_write)
             else:
