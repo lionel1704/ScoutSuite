@@ -116,7 +116,8 @@ class JavaScriptEncoder(ScoutResultEncoder):
                 results = json.dumps(content, indent=4 if debug else None, separators=(',', ': '), sort_keys=True, cls=ScoutJsonEncoder)
                 print('%s' % results, file=f)
                 if file_type == 'RESULTS':
-                    store_custom_format(json.loads(results), config_path, self.report_name, force_write)
+                    timestamp = datetime.datetime.now().strftime("%d-%m-%y %H:%M:%S")
+                    store_custom_format(json.loads(results), config_path, self.report_name, force_write, content.account_id, timestamp)
 
         except AttributeError as e:
             # __open_file returned None
@@ -144,7 +145,7 @@ class JavaScriptEncoder(ScoutResultEncoder):
         else:
             return None
 
-def store_custom_format(data, path, report_name, force_write):
+def store_custom_format(data, path, report_name, force_write, account_id, timestamp):
     try:
         output_path = os.path.normpath(path)
         path_array = output_path.split(os.sep)
@@ -152,13 +153,13 @@ def store_custom_format(data, path, report_name, force_write):
         path_array.append('positka')
         path_array.append(report_name)
         output_path = os.path.join(*path_array)
-        create_json_file_tree(data, output_path, report_name, force_write)
+        create_json_file_tree(data, output_path, report_name, force_write, account_id, timestamp)
     except Exception as e:
         print_exception(e)
 
 
 
-def create_json_file_tree(data, path, filename, force_write):
+def create_json_file_tree(data, path, filename, force_write, account_id, timestamp):
     try:
         metadata = {}
         for key in data:
@@ -170,7 +171,7 @@ def create_json_file_tree(data, path, filename, force_write):
                 sub_path = sub_path.replace(":", "_")
                 sub_path = sub_path.replace("*", "-")
                 sub_dir = os.path.join(path, sub_path)
-                create_json_file_tree(data[key], sub_dir, sub_path, force_write)
+                create_json_file_tree(data[key], sub_dir, sub_path, force_write, account_id, timestamp)
             else:
                 metadata[key] = data[key]
         output_path = os.path.normpath(path)
@@ -178,6 +179,9 @@ def create_json_file_tree(data, path, filename, force_write):
         if path_array[-2] == 'findings':
             metadata['service'] = path_array[-3]
             metadata['finding'] = path_array[-1]
+        if len(metadata) > 0:
+            metadata['account_id'] = account_id
+            metadata['timestamp'] = timestamp
         data_path = os.path.join(path, '{}.json'.format(filename))
         with JavaScriptEncoder._JavaScriptEncoder__open_file(data_path, force_write) as json_file:
             print('%s' % json.dumps(metadata, separators=(',', ': '), sort_keys=True, cls=ScoutJsonEncoder), file=json_file)
